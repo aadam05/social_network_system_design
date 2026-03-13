@@ -1,0 +1,293 @@
+openapi: 3.1.0
+info:
+  title: Travel Social Network API
+  version: 1.0.0
+
+paths:
+  /media/:
+    post:
+      summary: Upload media files for a post
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  maxItems: 10
+      responses:
+        "201":
+          description: Uploaded media references
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MediaRef"
+        "400":
+          description: Invalid files
+
+  /media:
+    delete:
+      summary: Delete all media for a post
+      parameters:
+        - name: post_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Post not found
+
+  /posts/:
+    post:
+      summary: Create a post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostCreate"
+      responses:
+        "201":
+          description: Post created
+        "400":
+          description: Invalid input
+
+    get:
+      summary: Search posts by location or get user/subscription feed
+      parameters:
+        - name: location
+          in: query
+          schema:
+            type: string
+          description: Location name to search (e.g. "paris")
+        - name: from
+          in: query
+          schema:
+            type: string
+          description: Country/region filter (e.g. "france")
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Get feed for a specific user; omit for subscription feed
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Pagination cursor for reverse-chronological scroll
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 10
+      responses:
+        "200":
+          description: List of posts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Post"
+                  next_cursor:
+                    type: string
+                    nullable: true
+
+  /posts/{post_id}/:
+    delete:
+      summary: Delete a post
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Not the post owner
+        "404":
+          description: Post not found
+
+  /posts/{post_id}/comments/:
+    post:
+      summary: Add a comment to a post
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  maxLength: 1024
+      responses:
+        "201":
+          description: Comment created
+        "404":
+          description: Post not found
+
+  /posts/{post_id}/reactions/:
+    post:
+      summary: Add a reaction to a post
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [like, love, wow, sad, angry]
+      responses:
+        "201":
+          description: Reaction added
+        "409":
+          description: Already reacted
+        "404":
+          description: Post not found
+
+    delete:
+      summary: Remove a reaction from a post
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Reaction removed
+        "404":
+          description: Reaction not found
+
+  /subscriptions/:
+    post:
+      summary: Subscribe to a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+      responses:
+        "201":
+          description: Subscribed
+        "409":
+          description: Already subscribed
+
+    delete:
+      summary: Unsubscribe from a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+      responses:
+        "204":
+          description: Unsubscribed
+        "404":
+          description: Subscription not found
+
+components:
+  schemas:
+    MediaRef:
+      type: object
+      properties:
+        fn:
+          type: string
+          description: Server-assigned filename (e.g. pic1.webp)
+        order:
+          type: integer
+          description: Display order within the post
+
+    PostCreate:
+      type: object
+      required: [description, location, media]
+      properties:
+        description:
+          type: string
+          maxLength: 4096
+        location:
+          type: array
+          description: "[latitude, longitude] as fixed-point integers (×1e7)"
+          items:
+            type: integer
+          minItems: 2
+          maxItems: 2
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/MediaRef"
+          maxItems: 10
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+        author_id:
+          type: string
+          format: uuid
+        description:
+          type: string
+        location:
+          type: array
+          items:
+            type: integer
+          minItems: 2
+          maxItems: 2
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/MediaRef"
+        reaction_count:
+          type: integer
+        comment_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
