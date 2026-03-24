@@ -52,23 +52,23 @@
         - metadata: 575 rps * (1024 + 200) bytes * 10 posts = 575 * 12 KB = 6 900 KB/s≈ 6.9 MB/s, peak 13.8 MB/s
 
 ### Storage
-- Posts (incl. seasonality):
+- Posts (incl. seasonality) (metadatas and blobs are stored in the same disk):
     Сapacity = 50 MB/s * 86 400 * 365 = 1 600 000 000 MB = 1.6 PB
     Disks_for_capacity = 1.6 PB / 100 TB = 16
     Disks_for_throughput = 18 GB/s / 500 MB/s = 32
     Disks_for_iops = 1000 / 1000 = 1
-    Disks = max(ceil(16), ceil(32), ceil(1)) = 32
+    Disks = max(ceil(16), ceil(32), ceil(1)) = x32 SSD (SATA) disks
 - Reactions (incl. seasonality):
     Сapacity = 80 KB/s * 86 400 * 365 = 2 500 000 000 KB = 2.5 TB
     Disks_for_capacity = 2.5 TB / 2 TB = 1.3
     Disks_for_throughput = 80 KB/s / 100 MB/s ≈ 0
     Disks_for_iops = 800 / 100 = 8
-    Disks = max(ceil(1.3), ceil(0), ceil(8)) = 8
+    Disks = max(ceil(1.3), ceil(0), ceil(8)) = x8 SSD (SATA) disks
 - Comments (incl. seasonality):
     Сapacity = 100 KB/s * 86 400 * 365 = 3 100 000 000 KB = 3.1 TB
     Disks_for_capacity = 3.1 TB / 2 TB = 1.7
     Disks_for_throughput = 100 KB/s / 100 MB/s ≈ 0
     Disks_for_iops = 300 / 100 = 3
-    Disks = max(ceil(1.7), ceil(0), ceil(3)) = 3
+    Disks = max(ceil(1.7), ceil(0), ceil(3)) = x3 SSD (SATA) disks
 
 - Conclusion: x32 SSD (SATA) more preffered for our system

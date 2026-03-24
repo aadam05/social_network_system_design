@@ -4,9 +4,49 @@ info:
   version: 1.0.0
 
 paths:
+  /media/upload-url/:
+    post:
+      summary: Get a presigned URL for direct upload to blob storage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename, content_type]
+              properties:
+                filename:
+                  type: string
+                content_type:
+                  type: string
+                  example: image/webp
+      responses:
+        "200":
+          description: Presigned upload URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upload_url:
+                    type: string
+                    description: Presigned S3 URL for PUT upload (expires in 15 min)
+                  blob_key:
+                    type: string
+                    description: Key to reference the blob after upload
+                  expires_at:
+                    type: string
+                    format: date-time
+        "400":
+          description: Invalid request
+
   /media/:
     post:
-      summary: Upload media files for a post
+      summary: Upload media files directly to S3 (S3 endpoint, max 512 KB per file)
+      description: >
+        This is a direct-to-S3 multipart upload endpoint. Each individual file
+        must not exceed 512 KB. Use /media/upload-url/ to obtain a presigned URL
+        for single-file uploads instead.
       requestBody:
         required: true
         content:
@@ -19,33 +59,20 @@ paths:
                   items:
                     type: string
                     format: binary
+                    description: Single file, max 512 KB
+                    maxLength: 524288
                   maxItems: 10
       responses:
         "201":
-          description: Uploaded media references
+          description: Uploaded blob references
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/MediaRef"
+                  $ref: "#/components/schemas/BlobRef"
         "400":
-          description: Invalid files
-
-  /media:
-    delete:
-      summary: Delete all media for a post
-      parameters:
-        - name: post_id
-          in: query
-          required: true
-          schema:
-            type: integer
-      responses:
-        "204":
-          description: Deleted
-        "404":
-          description: Post not found
+          description: Invalid files or file size exceeded
 
   /posts/:
     post:
@@ -151,6 +178,43 @@ paths:
         "404":
           description: Post not found
 
+    get:
+      summary: Get comments for a post (includes reactions per comment)
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Pagination cursor
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: List of comments with reactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comments:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Comment"
+                  next_cursor:
+                    type: string
+                    nullable: true
+        "404":
+          description: Post not found
+
   /posts/{post_id}/reactions/:
     post:
       summary: Add a reaction to a post
@@ -232,11 +296,73 @@ paths:
         "404":
           description: Subscription not found
 
+    get:
+      summary: Get users the current user is subscribed to
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: List of subscriptions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserRef"
+                  next_cursor:
+                    type: string
+                    nullable: true
+
+  /subscribers/:
+    get:
+      summary: Get users subscribed to the current user
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: List of subscribers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserRef"
+                  next_cursor:
+                    type: string
+                    nullable: true
+
 components:
   schemas:
-    MediaRef:
+    BlobRef:
       type: object
       properties:
+        blob_key:
+          type: string
+          description: Storage key for the blob
         fn:
           type: string
           description: Server-assigned filename (e.g. pic1.webp)
@@ -246,22 +372,25 @@ components:
 
     PostCreate:
       type: object
-      required: [description, location, media]
+      required: [description, latitude, longitude]
       properties:
         description:
           type: string
           maxLength: 4096
-        location:
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        blobs:
           type: array
-          description: "[latitude, longitude] as fixed-point integers (×1e7)"
           items:
-            type: integer
-          minItems: 2
-          maxItems: 2
-        media:
-          type: array
-          items:
-            $ref: "#/components/schemas/MediaRef"
+            $ref: "#/components/schemas/BlobRef"
           maxItems: 10
 
     Post:
@@ -274,16 +403,16 @@ components:
           format: uuid
         description:
           type: string
-        location:
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        blobs:
           type: array
           items:
-            type: integer
-          minItems: 2
-          maxItems: 2
-        media:
-          type: array
-          items:
-            $ref: "#/components/schemas/MediaRef"
+            $ref: "#/components/schemas/BlobRef"
         reaction_count:
           type: integer
         comment_count:
@@ -291,3 +420,42 @@ components:
         created_at:
           type: string
           format: date-time
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+        author_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        parent_comment_id:
+          type: integer
+          nullable: true
+        reactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reaction"
+        created_at:
+          type: string
+          format: date-time
+
+    Reaction:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [like, love, wow, sad, angry]
+        count:
+          type: integer
+
+    UserRef:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
