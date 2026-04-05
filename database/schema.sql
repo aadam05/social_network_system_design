@@ -2,14 +2,15 @@ CREATE TABLE "users" (
   "id" integer PRIMARY KEY,
   "username" varchar(50) NOT NULL UNIQUE,
   "created_at" timestamp NOT NULL DEFAULT now(),
-  "updated_at" timestamp NOT NULL DEFAULT now()
+  "updated_at" timestamp NOT NULL DEFAULT now(),
+  "is_celebrity" boolean NOT NULL DEFAULT false
 );
 
 CREATE TABLE "follows" (
-  "following_user_id" integer NOT NULL,
-  "followed_user_id" integer NOT NULL,
+  "follower_id" integer NOT NULL,
+  "followee_id" integer NOT NULL,
   "created_at" timestamp NOT NULL DEFAULT now(),
-  PRIMARY KEY ("following_user_id", "followed_user_id")
+  PRIMARY KEY ("follower_id", "followee_id")
 );
 
 -- Distinct locations table for text-based search by country/city
@@ -66,9 +67,9 @@ ALTER TABLE "posts" ADD CONSTRAINT "user_posts" FOREIGN KEY ("user_id") REFERENC
 
 ALTER TABLE "posts" ADD CONSTRAINT "post_location" FOREIGN KEY ("location_id") REFERENCES "locations" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "follows" ADD FOREIGN KEY ("following_user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "follows" ADD FOREIGN KEY ("follower_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "follows" ADD FOREIGN KEY ("followed_user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "follows" ADD FOREIGN KEY ("followee_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "blobs" ADD FOREIGN KEY ("post_id") REFERENCES "posts" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
@@ -91,7 +92,7 @@ CREATE INDEX ON "locations" USING GIST ("location");
 
 CREATE INDEX ON "locations" ("country_name", "city_name");
 
-CREATE INDEX ON "follows" ("followed_user_id");
+CREATE INDEX ON "follows" ("followee_id");
 
 CREATE INDEX ON "blobs" ("post_id");
 

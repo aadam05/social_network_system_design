@@ -4,54 +4,69 @@
 
 ### Functional requirements:
 - Publishing travel posts with photos, a short description, and a link to a specific travel destination
-- Rating and commenting on other travelers' posts
-- Subscribing to other travelers to follow their activity
+- Rating and commenting on other travelers posts
+- Subscribing/Unsubscribing to other travelers to follow their activity
 - Searching for popular travel destinations and viewing posts from those places
-- Viewing other travelers' feeds and a user feed based on subscriptions in reverse chronological order
+- Viewing other travelers' feeds based on subscriptions and a user feed, both in reverse chronological order
 - Support phone & web
 
 ### Non-functional requirements
 - 10 000 000 DAU
-- Support x2 load on holidays (new year, winter, summer), duration is 3 months
+- Support x2 load on holidays (new year, winter holidays, summer holidays), overall duration is 3 months
+- 99.9% availability per year (~8 hours of downtime)
+- For CIS countries
 - Write 1 post per week
-    - Pictures: max 512 KB per picture (do compression), max 10 pictures, 4 pictures on avg
+    - 3 seconds for creation
+    - Pictures: max 512 KB per picture (do compression on a client side), max 10 pictures, 4 pictures on avg
     - Description: max 2048 chars, max 4096 bytes (not 1 byte per char due to CIS country focus), 512 chars on avg
-    - Location: 200 bytes
+    - Location data: 512 bytes
 - Write 5 reactions for posts per day
 - Write 2 comments for posts per day (text <= 1024 chars)
-- Read feed x5 including search (10 posts per request) per day
-    - Max 2 seconds per request
-    - 1 MB size of each compressed picture
-- Write 3 subscribe/cancel to someone per day
+- Read feed x5 (10 posts per request) per day
+    - Eventual consistency on reading other travelers posts
+    - Get feed for 2 seconds
+- Read feed by searching place x2 (10 posts per request) per day
+    - Eventual consistency on reading other travelers posts
+    - Get feed for 3 seconds
+- Write 1 subscribe/unsubscribe to someone per day
+    - subscribe/unsubscribe in 1 second
     - ~100 subscriptions per user
-    - ~500 subscribers per user
+    - ~100 subscribers per user
     - Consider celebrities, max 1 million subs
-- For CIS countries
-- 99.9% availability per year (~8 hours of downtime)
 
 ### RPS
 - TPS (Transactions Per Second):
     - Post: 10 000 000 / 7 / 86 400 = 16, peak 32
     - Reactions: 10 000 000 * 5 / 86 400 = 575, peak 1150
     - Comments: 10 000 000 * 2 / 86 400 = 230, peak 460
-    - Subscribe/cancel: 10 000 000 * 3 / 86 400 = 345, peak 690
+    - Subscribe/unsubscribe: 10 000 000 * 1 / 86 400 = 115, peak 230
 - QPS (Queries Per Second):
     - Feed: 10 000 000 * 5 / 86 400 = 575, peak 1150
+    - Searching places: 10 000 000 * 2 / 86 400 = 230, peak 460
 
 ### Traffic
 - TPS (Transactions Per Second):
     - Post:
         - media: 16 rps * (512 KB picture * 4 number of pictures on avg) = 16 * 2 MB = 32 MB/s, peak 64 MB/s
-        - metadata: 16 rps * (1024 bytes desc. + 200 bytes location) = 16 * 2 KB = 32 KB/s, peak 64 KB/s
+        - metadata: 16 rps * (1024 bytes desc. + 512 bytes location) = 16 * 2 KB = 32 KB/s, peak 64 KB/s
     - Reactions: 575 rps * 100 bytes = 56 KB/s, peak 112 KB/s
     - Comments: 230 rps * 300 bytes = 70 KB/s, 140 KB/s
-    - Subscribe/cancel: 345 rps * 100 bytes = 34 KB/s, peak 68 KB/s
+    - Subscribe/unsubscribe: 115 rps * 100 bytes = 12 KB/s, peak 24 KB/s
 - QPS (Queries Per Second):
     - Feed:
-        - media: 575 rps * (512 KB picture * 4 number of pictures on avg) * 10 posts = 575 * 2 MB * 10 posts = 11 500 MB/s ≈ 12 GB/s, peak 24 GB/s
-        - metadata: 575 rps * (1024 + 200) bytes * 10 posts = 575 * 12 KB = 6 900 KB/s≈ 6.9 MB/s, peak 13.8 MB/s
+        - media: 575 rps * (512 KB picture * 4 number of pictures on avg) * 10 posts = 575 * 2 MB * 10 posts = 11 500 MB/s = 12 GB/s, peak 24 GB/s
+        - metadata: 575 rps * (1024 + 512) bytes * 10 posts = 575 * 20 KB = 12 000 KB/s = 12 MB/s, peak 24 MB/s
+    - Searching places:
+        - media: 230 rps * (512 KB picture * 4 number of pictures on avg) * 10 posts = 230 * 2 MB * 10 posts = 4 600 MB/s = 5 GB/s, peak 10 GB/s
+        - metadata: 230 rps * (1024 + 512) bytes * 10 posts = 230 * 20 KB = 4 600 KB/s = 5 MB/s, peak 10 MB/s
 
 ### Storage
+
+Disks_for_capacity = capacity / disk_capacity
+Disks_for_throughput = traffic_per_second / disk_throughput
+Disks_for_iops = iops / disk_iops
+Disks = max(ceil(Disks_for_capacity), ceil(Disks_for_throughput), ceil(Disks_for_iops))
+
 - Posts (incl. seasonality) (metadatas and blobs are stored in the same disk):
     Сapacity = 50 MB/s * 86 400 * 365 = 1 600 000 000 MB = 1.6 PB
     Disks_for_capacity = 1.6 PB / 100 TB = 16
