@@ -89,7 +89,10 @@ Disks = max(ceil(Disks_for_capacity), ceil(Disks_for_throughput), ceil(Disks_for
 ### Replication & Sharding
 - database: PgSQL + S3
 - async, replication factor - 2, master-slave
-- hash based sharding, `user_id` as key, consistent hashing approach
+- hash based sharding, `post_id` as key, consistent hashing approach
+    - Why `post_id`, not `user_id`?
+    - in case `post_id` viral posts retrieves faster since data in one shard
+    - since user feed take a place, it can lead to cross shard queries, handle with Redis
 
 - Posts
     - Hosts = 32 disks / 2 disks_per_host = 16
