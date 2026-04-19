@@ -1,0 +1,33 @@
+@startuml C4_Social_Network
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Social Network — Media System & Container Diagram
+
+Person(user, "User", "Uploads media for posts")
+
+Container(api_gw, "API Gateway", "Nginx", "Hides infra and proxies media uploads to media service")
+
+System_Boundary(sn, "Media System") {
+    Container(media_svc, "Media Service", "Service", "Processes media files (watermark, moderating); stages uploads in temp bucket; promotes to main on post creation")
+    Container(cdc, "CDC Service", "Debezium / custom job", "Monitors temp_media bucket with age threshold T (skips objects newer than T); Deletes confirmed orphaned files from temp bucket")
+}
+
+System_Ext(cdn, "CDN / Cloudflare", "Retrieve and keep media/static files for traffic economy, pull model")
+System_Ext(blob, "Blob Storage (main)", "S3 / NetApp — permanent media for published posts")
+System_Ext(temp_blob, "Blob Storage (temp)", "S3 / NetApp — staging bucket for media uploaded before post creation")
+
+' ── User → End-To-End ──────────────────────────────────────────────
+Rel(user, api_gw,)
+Rel(user, cdn,)
+
+Rel(api_gw, media_svc,)
+
+Rel(media_svc, temp_blob,)
+Rel(media_svc, blob,)
+Rel(cdn, blob,)
+
+' ── CDC flow (temp bucket evaluation) ─────────────────────────────────
+Rel(temp_blob, cdc, "Object lifecycle events (age > T)", "S3 event / polling")
+Rel(cdc, temp_blob, "Delete confirmed orphaned media",  "S3 API")
+
+@enduml

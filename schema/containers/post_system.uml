@@ -1,0 +1,37 @@
+@startuml C4_Social_Network
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Social Network — Post System & Container Diagram
+
+Person(user, "User", "Creates posts")
+
+Container(api_gw, "API Gateway", "Nginx", "Hides infra and proxies requests to post service")
+
+Container(mobile_bff, "Mobile BFF", "Service", "Aggregates and shapes responses for mobile clients")
+Container(web_bff, "Web BFF", "Service", "Aggregates and shapes responses for web clients")
+
+System_Boundary(sn, "Post System") {
+    Container(post_svc, "Post Service", "Service", "Manages posts, comments, reactions, searching")
+    ContainerDb(post_db, "Post DB", "PostgreSQL+PostGIS (for spatial queries); Replication Factor = 3, Master–Slave", "Tables: posts, comments, reactions; post_outbox — transactional outbox for reliable Kafka publishing")
+}
+
+Container(kafka, "Message Broker", "Apache Kafka", "topics: new_posts, relation_ops")
+Container(media_svc, "Media Service", "Service", "Processes post metadata and actual media's bindings")
+
+' ── User → End-To-End ──────────────────────────────────────────────
+Rel(user, api_gw,)
+
+' ── Gateway → BFFs ──────────────────────────────────────────────
+Rel(api_gw, mobile_bff,)
+Rel(api_gw, web_bff,)
+
+' ── BFFs → Services ─────────────────────────────────────────────
+Rel(mobile_bff, post_svc,)
+Rel(web_bff, post_svc,)
+
+' ── Post flow ───────────────────────────────────────────────────
+Rel(post_svc, post_db,)
+Rel(post_svc, media_svc,)
+Rel(post_svc, kafka, "Publish events into new_posts topic")
+
+@enduml

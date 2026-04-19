@@ -1,0 +1,14 @@
+@startuml C4_Social_Network
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+Person(user, "User")
+
+Container(post_svc, "Post Service", "Service", "Manages posts, comments, reactions, searching")
+Container(feed_svc, "Feed Service", "Service", "Maintains user/home feeds")
+Container(relation_svc, "Relation Service", "Service", "Manages follow/unfollow")
+Container(media_svc, "Media Service", "Service", "Processes media files")
+
+Rel(user, post_svc,)
+Rel(user, feed_svc,)
+Rel(user, relation_svc,)
+Rel(user, media_svc,)
