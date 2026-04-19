@@ -1,0 +1,37 @@
+@startuml C4_Social_Network
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Social Network — Feed System & Container Diagram
+
+Person(user, "User", "Gets user/home feeds")
+
+Container(api_gw, "API Gateway", "Nginx", "Hides infra and proxies requests to feed service")
+
+Container(mobile_bff, "Mobile BFF", "Service", "Aggregates and shapes responses for mobile clients")
+Container(web_bff, "Web BFF", "Service", "Aggregates and shapes responses for web clients")
+
+System_Boundary(sn, "Feed System") {
+    Container(feed_svc, "Feed Service", "Service", "maintains user/home feeds (merges home&celebrities feeds)")
+    ContainerDb(feed_db, "Feed DB", "Redis", "Per-user feed: last 10 own posts + last 20 followers' posts (30 entries × 4 KB)\nEstimated size: 4 KB × 30 × 10 000 000 users ≈ 1.2 TB * 3 Replication Factor = 3.6 TB")
+}
+
+Container(post_svc, "Post Service", "Service", "Manages posts, comments, reactions, searching")
+Container(kafka, "Message Broker", "Apache Kafka", "topics: new_posts, relation_ops")
+
+' ── User → End-To-End ──────────────────────────────────────────────
+Rel(user, api_gw,)
+
+' ── Gateway → BFFs ──────────────────────────────────────────────
+Rel(api_gw, mobile_bff,)
+Rel(api_gw, web_bff,)
+
+' ── BFFs → Services ─────────────────────────────────────────────
+Rel(mobile_bff, feed_svc,)
+Rel(web_bff, feed_svc,)
+
+' ── Feed flow ───────────────────────────────────────────────────
+Rel(feed_svc, feed_db,)
+Rel(feed_svc, post_svc, "Read from post_svc directly if feed exhausted")
+Rel(feed_svc, kafka, "Listens to new_posts and relation_ops topics")
+
+@enduml
