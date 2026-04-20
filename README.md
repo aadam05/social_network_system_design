@@ -86,4 +86,20 @@ Disks = max(ceil(Disks_for_capacity), ceil(Disks_for_throughput), ceil(Disks_for
     Disks_for_iops = 300 / 100 = 3
     Disks = max(ceil(1.7), ceil(0), ceil(3)) = x3 SSD (SATA) disks
 
-- Conclusion: x32 SSD (SATA) more preffered for our system
+### Replication & Sharding
+- database: PgSQL + S3
+- async, replication factor - 2, master-slave
+- hash based sharding, `post_id` as key, consistent hashing approach
+    - Why `post_id`, not `user_id`?
+    - in case `post_id` viral posts retrieves faster since data in one shard
+    - since user feed take a place, it can lead to cross shard queries, handle with Redis
+
+- Posts
+    - Hosts = 32 disks / 2 disks_per_host = 16
+    - Hosts_with_replication = 16 hosts * 2 replication_factor = 32
+- Reactions
+    - Hosts = 8 disks / 2 disks_per_host = 4
+    - Hosts_with_replication = 4 hosts * 2 replication_factor = 8
+- Comments
+    - Hosts = 3 disks / 2 disks_per_host = 2
+    - Hosts_with_replication = 2 hosts * 2 replication_factor = 4
